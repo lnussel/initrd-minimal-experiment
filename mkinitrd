@@ -4,6 +4,9 @@ dest="d"
 rm -rf "$dest"
 ./installbusyboxstatic "$dest"
 
+install -m 644 /etc/os-release "$dest"/etc/initrd-release
+/usr/lib/dracut/dracut-install -l -D "$dest" ~/git/systemd/x86_64-suse-linux/systemd-sysext /usr/bin/systemd-sysext
+
 cat > "$dest/init" <<'EOF'
 #!/bin/sh
 echo "executed $0"
@@ -16,6 +19,8 @@ fi
 exec /bin/sh
 EOF
 chmod 755 "$dest/init"
+
+/usr/sbin/ldconfig -nNr "$dest" /usr/lib64
 
 cd "$dest"
 find -print0 | cpio --format newc --null -R root:root -o --quiet | zstd -3 -T0 -q > ../initrd

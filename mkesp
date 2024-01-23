@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-rm esp
+rm -f esp
 /usr/sbin/mkfs.vfat -C esp $[100*1024]
 while read file; do
 	if [ -d "efi/$file" ]; then

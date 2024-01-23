@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 : "${kv:=$(uname -r)}"
+: "${sdboot:=/usr/lib/systemd/boot/efi/systemd-bootx64.efi}"
+: "${sdstub:=/home/ln/git/systemd/x86_64-suse-linux/src/boot/efi/linuxx64.efi.stub}"
+
 rm -rf efi
 mkdir -p efi/EFI/BOOT
 mkdir -p efi/EFI/Linux
@@ -8,10 +11,10 @@ mkdir -p efi/EFI/Linux
 read -r token < /etc/machine-id
 dst=efi/EFI/Linux/"$token-$kv.efi"
 
-cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi efi/EFI/BOOT/BOOTX64.EFI
+cp "$sdboot" efi/EFI/BOOT/BOOTX64.EFI
 
 /usr/lib/systemd/ukify build \
-	--stub=/home/ln/git/systemd/x86_64-suse-linux/src/boot/efi/linuxx64.efi.stub \
+	--stub="$sdstub" \
 	--linux=/usr/lib/modules/"$kv"/vmlinuz \
 	--initrd=initrd \
 	--cmdline="quiet console=ttyS0 console=tty" \
@@ -39,6 +42,12 @@ cd "$dst.extra.d"
 	done
 	for m in "${!mods[@]}"; do
 		fn="${mods[$m]}"
-		cp "$fn" "modules/${fn##*/}"
+		dfn="modules/${fn##*/}"
+		case "$fn" in
+			*.zst) zstdcat "$fn" > "${dfn%.zst}" ;;
+			*.ko) cp "$fn" "$dfn" ;;
+			*) echo "unknown file format" >&2 ;;
+		esac
 	done
+
 cd -
