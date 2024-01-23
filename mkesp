@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+rm esp
+/usr/sbin/mkfs.vfat -C esp $[100*1024]
+while read file; do
+	if [ -d "efi/$file" ]; then
+		mmd -i esp "::$file"
+	else
+		mcopy -i esp "efi/$file" "::$file"
+	fi
+done < <(find efi -mindepth 1 -printf '%P\n')

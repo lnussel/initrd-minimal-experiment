@@ -1,0 +1,17 @@
+#!/bin/bash
+dest="${1:?}"
+if [ -e "$dest" ]; then
+	echo "$dest exists" >&2
+	exit 1
+fi
+mkdir -p "$dest"/usr/{bin,sbin,lib,lib64}
+mkdir -p "$dest"/{etc,dev,proc,sys,run,var,sysroot,tmp}
+ln -s usr/bin "$dest"
+ln -s usr/sbin "$dest"
+ln -s usr/lib "$dest"
+ln -s usr/lib64 "$dest"
+
+install /usr/bin/busybox-static "$dest/usr/bin"
+while read -r file; do
+	ln -s ../bin/busybox-static "$dest$file"
+done < /usr/share/busybox/busybox.links

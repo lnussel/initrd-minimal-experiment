@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+dest="d"
+rm -rf "$dest"
+./installbusyboxstatic "$dest"
+
+cat > "$dest/init" <<'EOF'
+#!/bin/sh
+echo "executed $0"
+if [ "$$" = 1 ] && ! [ -e /proc/1 ]; then
+	mount -t proc proc /proc
+	mount -t devtmpfs devtmpfs /dev
+	mount -t sysfs sysfs /sys
+	mount -t tmpfs tmpfs /tmp
+fi
+exec /bin/sh
+EOF
+chmod 755 "$dest/init"
+
+cd "$dest"
+find -print0 | cpio --format newc --null -R root:root -o --quiet | zstd -3 -T0 -q > ../initrd
+cd ..

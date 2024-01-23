@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+: "${kv:=$(uname -r)}"
+rm -rf efi
+mkdir -p efi/EFI/BOOT
+mkdir -p efi/EFI/Linux
+
+read -r token < /etc/machine-id
+dst=efi/EFI/Linux/"$token-$kv.efi"
+
+cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi efi/EFI/BOOT/BOOTX64.EFI
+
+/usr/lib/systemd/ukify build \
+	--stub=/home/ln/git/systemd/x86_64-suse-linux/src/boot/efi/linuxx64.efi.stub \
+	--linux=/usr/lib/modules/"$kv"/vmlinuz \
+	--initrd=initrd \
+	--cmdline="quiet console=ttyS0 console=tty" \
+	--splash=splash.bmp \
+	--output "$dst"
+
+mkdir -p "$dst.extra.d/modules"
+cd "$dst.extra.d"
+
+	declare -A mods
+	todo=(btrfs vfat overlay efivarfs virtio_blk qemu_fw_cfg)
+	i=0
+	while [ "$i" -lt "${#todo[@]}" ]; do
+		module="${todo[$i]}"
+		: $((i++))
+		[ -z "${mods[$module]}" ] || continue
+		fn="$(/usr/sbin/modinfo -k "$kv" -F filename "$module")"
+		[ "$fn" != "(builtin)" ] || continue
+		mods["$module"]="$fn"
+		IFS=, read -r -a d < <(/usr/sbin/modinfo -k "$kv" -F depends "$module" || :)
+		for m in "${d[@]}"; do
+			[ -z "${mods[$m]}" ] || continue
+			todo+=("$m")
+		done
+	done
+	for m in "${!mods[@]}"; do
+		fn="${mods[$m]}"
+		cp "$fn" "modules/${fn##*/}"
+	done
+cd -

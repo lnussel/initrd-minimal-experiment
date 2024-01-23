@@ -1,0 +1,5 @@
+#!/bin/bash
+if [ "$#" -lt 2 ]; then
+	set -- "$@" /bin/sh -
+fi
+exec bwrap --clearenv --unshare-all --bind "$1" / --proc /proc --dev /dev --tmpfs /tmp --tmpfs /run --uid 0 --gid 0 "${@:2}"
