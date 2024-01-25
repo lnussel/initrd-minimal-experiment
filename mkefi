@@ -17,7 +17,7 @@ cp "$sdboot" efi/EFI/BOOT/BOOTX64.EFI
 	--stub="$sdstub" \
 	--linux=/usr/lib/modules/"$kv"/vmlinuz \
 	--initrd=initrd \
-	--cmdline="quiet console=ttyS0 console=tty" \
+	--cmdline="verbose console=ttyS0 console=tty" \
 	--splash=splash.bmp \
 	--output "$dst"
 
