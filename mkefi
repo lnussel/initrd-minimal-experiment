@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 : "${kv:=$(uname -r)}"
-: "${sdboot:=/usr/lib/systemd/boot/efi/systemd-bootx64.efi}"
-: "${sdstub:=/home/ln/git/systemd/x86_64-suse-linux/src/boot/efi/linuxx64.efi.stub}"
+: "${pfx:=/usr/lib/systemd}"
+: "${sdboot:=$pfx/boot/efi/systemd-bootx64.efi}"
+: "${sdstub:=$pfx/boot/efi/linuxx64.efi.stub}"
 
 rm -rf efi
 mkdir -p efi/EFI/BOOT
