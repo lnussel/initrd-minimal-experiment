@@ -2,10 +2,35 @@
 set -e
 dest="d"
 rm -rf "$dest"
-./installbusyboxstatic "$dest"
 
-install -m 644 /etc/os-release "$dest"/etc/initrd-release
-#/usr/lib/dracut/dracut-install -l -D "$dest" ~/git/systemd/x86_64-suse-linux/systemd-sysext /usr/bin/systemd-sysext
+mkdir -p "$dest"/usr/{bin,sbin,lib,lib64}
+mkdir -p "$dest"/{etc,dev,proc,sys,run,var,sysroot,tmp}
+ln -s usr/bin "$dest"
+ln -s usr/sbin "$dest"
+ln -s usr/lib "$dest"
+ln -s usr/lib64 "$dest"
+
+# just some fallback
+cat <<'EOF' > "$dest"/etc/initrd-release
+NAME="busybox"
+ID="busybox"
+ID_LIKE="opensuse suse"
+ANSI_COLOR="0;32"
+EOF
+
+install /usr/bin/busybox-static "$dest/usr/bin"
+ln "$dest/usr/bin/busybox-static" "$dest/usr/bin/sh"
+ln "$dest/usr/bin/busybox-static" "$dest/usr/bin/mount"
+mkdir -p "$dest/usr/lib/busybox"
+while read -r file; do
+	ln "$dest/usr/bin/busybox-static" "$dest/usr/lib/busybox/$file"
+done < <(busybox-static --list)
+cat > "$dest/etc/profile" <<'EOF'
+#!/bin/sh
+# fallback to busybox tools
+PATH="$PATH:/usr/lib/busybox"
+export PATH
+EOF
 
 cat > "$dest/init" <<'EOF'
 #!/bin/sh
@@ -16,10 +41,9 @@ if [ "$$" = 1 ] && ! [ -e /proc/1 ]; then
 	mount -t sysfs sysfs /sys
 	mount -t tmpfs tmpfs /tmp
 fi
-exec /bin/sh
+. /etc/profile
+exec /bin/sh -i < /dev/console > /dev/console 2>&1
 EOF
 chmod 755 "$dest/init"
-
-/usr/sbin/ldconfig -nNr "$dest" /usr/lib64
 
 (cd "$dest"; find . -print0 | cpio --format newc --null -R root:root -o --quiet) > initrd-busybox
