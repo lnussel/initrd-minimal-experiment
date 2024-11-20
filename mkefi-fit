@@ -1,0 +1,76 @@
+#!/bin/bash
+set -ex
+shopt -s nullglob
+
+: "${mkimage:=mkimage}"
+: "${ARCH:=$(uname -m)}"
+case "$ARCH" in
+	x86_64) efiarch=x64; uarch="$ARCH" ;;
+	aarch64) efiarch=aa64; uarch="arm64" ;;
+	*) echo "unknown arch $ARCH" >&2; exit 1 ;;
+esac
+: "${kv:=$(uname -r)}"
+
+tried=()
+locate_kernel() {
+	for i in /lib/modules/$kv/{vmlinuz,Image} /boot/vmlinuz-$kv; do
+		kernel="$i"
+		tried+=("$kernel")
+		[ -e "$kernel" ] || continue
+		echo "Using kernel $kv"
+		break
+	done
+}
+if ! [ -e "$kernel" ]; then
+	kernels=(/lib/modules/*/{kernel,vmlinz,Image})
+	kernels=("${kernels[@]%/*}")
+	kernels=("${kernels[@]##*/}")
+	if [ "${#kernels[@]}" = 1 ]; then
+		kv="${kernels[0]}"
+		locate_kernel
+	fi
+	if ! [ -e "$kernel" ]; then
+		echo -e "None of the following kernels found: ${tried[*]/#/\\n  }"
+		echo -e "Try one of the following: ${kernels[*]/#/\\n  kv=}"
+		exit 1
+	fi
+fi
+
+rm -rf efi
+if [ -n "$KEYNAME" ]; then
+	if ! [ -e keys/"$KEYNAME".crt ]; then
+		echo "$KEYNAME does not exist"
+		exit 1
+	fi
+	cat > empty.dts <<-EOF
+	/dts-v1/;
+
+	/ {
+		signature {
+		};
+	};
+	EOF
+	dtc -o "$KEYNAME.dtb" empty.dts
+	rm empty.dts
+fi
+mkdir -p efi/FIT
+rm -f Image
+ln -s "$kernel" Image
+#zcat "$kernel" > Image
+sed -e "s,@FIT@,FIT/Linux-$kv.fit," < boot.env.in > boot.env
+$mkimage -f auto -A "$uarch" -T script -C none -n 'U-Boot script' -d boot.env boot.scr
+mkimage_args=(-v -f kernel.its."$ARCH" -r)
+[ -z "$KEYNAME" ] || mkimage_args+=(-K "$KEYNAME.dtb" -k "keys" -o sha256,rsa2048)
+#mkimage_args+=(-g foo -k keys -o sha256,rsa2048)
+set -x
+if [ -n "$ROOTFS_UUID" ]; then
+	sed -e "/^setenv bootargs/s/\$/ root=UUID=$ROOTFS_UUID/" < bootargs.env.in > bootargs.env
+else
+	cp bootargs.env.in bootargs.env
+fi
+$mkimage "${mkimage_args[@]}" kernel.fit
+# verify signature was added as mkimage may not fail
+fdtget "$KEYNAME".dtb /signature/key-signkey required
+#cp ~/git/linux-cip/arch/arm64/boot/Image efi/EFI/BOOT/bootaa64.efi
+cp kernel.fit efi/FIT/Linux-"$kv".fit
+cp boot.scr efi/boot.scr

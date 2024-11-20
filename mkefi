@@ -1,24 +1,46 @@
 #!/bin/bash
 set -e
+shopt -s nullglob
+
+: "${ARCH:=$(uname -m)}"
+case "$ARCH" in
+	x86_64) efiarch=x64 ;;
+	aarch64) efiarch=aa64 ;;
+	*) echo "unknown arch $ARCH" >&2; exit 1 ;;
+esac
 : "${kv:=$(uname -r)}"
 : "${pfx:=/usr/lib/systemd}"
-: "${sdboot:=$pfx/boot/efi/systemd-bootx64.efi}"
-: "${sdstub:=$pfx/boot/efi/linuxx64.efi.stub}"
+: "${sdboot:=$pfx/boot/efi/systemd-boot$efiarch.efi}"
+: "${sdstub:=$pfx/boot/efi/linux$efiarch.efi.stub}"
+: "${cmdline:=verbose console=ttyS0 console=tty}"
+# "${keyfile:=private.pem}"
+
+for i in vmlinuz Image; do
+	kernel="/lib/modules/$kv/$i"
+	[ -e "$kernel" ] || continue
+	break
+done
+if ! [ -e "$kernel" ]; then
+	echo "$kernel not found. Set \$kv to one of the following versions:"
+	echo /lib/modules/*/{vmlinz,Image}
+	exit 1
+fi
 
 rm -rf efi
+
+read -r token < /etc/machine-id
+
 mkdir -p efi/EFI/BOOT
 mkdir -p efi/EFI/Linux
 
-read -r token < /etc/machine-id
 dst=efi/EFI/Linux/"$token-$kv.efi"
-
-cp "$sdboot" efi/EFI/BOOT/BOOTX64.EFI
+cp "$sdboot" efi/EFI/BOOT/BOOT${efiarch^^}.EFI
 
 /usr/lib/systemd/ukify build \
 	--stub="$sdstub" \
-	--linux=/usr/lib/modules/"$kv"/vmlinuz \
+	--linux="$kernel" \
 	--initrd=initrd \
-	--cmdline="verbose console=ttyS0 console=tty" \
+	--cmdline="${cmdline}" \
 	--splash=splash.bmp \
 	--output "$dst"
 
@@ -52,3 +74,5 @@ cd "$dst.extra.d"
 	done
 
 cd -
+
+: > efi-stamp

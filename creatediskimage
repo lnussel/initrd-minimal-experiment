@@ -1,0 +1,61 @@
+#!/bin/bash
+set -e
+
+# size in MB
+esp_size=100
+img_size=1024
+
+image="${1:?}"
+efi="${2:?}"
+data="${3:?}"
+
+tmpdir=$(mktemp -d -t mkimage.XXXXXX)
+cleanup()
+{
+	rm -rf "$tmpdir"
+}
+trap cleanup EXIT
+
+esp="$tmpdir/esp"
+/usr/sbin/mkfs.vfat -C "$esp" $[$esp_size*1024]
+while read file; do
+	if [ -d "$efi/$file" ]; then
+		mmd -i "$esp" "::$file"
+	else
+		mcopy -i "$esp" "$efi/$file" "::$file"
+	fi
+done < <(find "$efi" -mindepth 1 -printf '%P\n')
+du -sh "$esp"
+
+img="$image.new"
+truncate -s "${img_size}M" "$img"
+/usr/sbin/sfdisk "$img" <<EOF
+label: gpt
+
+type="EFI System", size=100MiB, bootable, attrs=LegacyBIOSBootable
+type="Linux root (ARM-64)"
+EOF
+
+/usr/sbin/sfdisk -J "$img" > "$tmpdir/partitions.json"
+cat "$tmpdir/partitions.json"
+mapfile -t offsets < <(jq '.partitiontable.partitions[]|.start' "$tmpdir/partitions.json")
+mapfile -t sizes < <(jq '.partitiontable.partitions[]|.size' "$tmpdir/partitions.json")
+echo "${offsets[@]}"
+
+if [ -z "$ROOTFS_UUID" ]; then
+	if [ -e "$image.rootfs_uuid" ]; then
+		read -r ROOTFS_UUID < "$image.rootfs_uuid"
+	else
+		ROOTFS_UUID=$(uuidgen)
+	fi
+fi
+[ -e "$image.rootfs_uuid" ] || echo "$ROOTFS_UUID" > "$image.rootfs_uuid"
+dd if="$esp" of="$img" bs=512 seek="${offsets[0]}" status=none conv=notrunc
+if [ -e /usr/bin/mkfs.erofs ]; then
+	mkfs.erofs -U "$ROOTFS_UUID" --all-root rootfs.erofs "$data"
+	dd if=rootfs.erofs of="$img" seek="$((${offsets[1]}))" conv=notrunc
+else
+fakeroot /usr/sbin/mkfs.ext4 -F -L rootfs -U "${ROOTFS_UUID}" -d "$data" -E no_copy_xattrs,root_owner=0:0,offset="$[${offsets[1]}*512]" "$img" "$[${sizes[1]}*512/1024]k"
+fi
+
+mv "$img" "$image"

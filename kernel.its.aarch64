@@ -1,0 +1,78 @@
+/dts-v1/;
+/ {
+  description = "Boot Linux";
+  #address-cells = <1>;
+  images {
+    kernel {
+      description = "Linux kernel";
+      data = /incbin/("Image");
+      type = "kernel_noload";
+      arch = "arm64";
+      os = "linux";
+      compression = "gzip";
+      // for some reason bootm insits the entries exist even though unused
+      load = <0x0000000>;
+      entry = <0x0000000>;
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+    /*
+    fdt {
+      description = "Flattened Device Tree blob";
+      data = /incbin/("qemu1.dtb");
+      type = "flat_dt";
+      arch = "arm64";
+      compression = "none";
+      //load = <0x46800000>;
+      //load = <0x40000000>;
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+    */
+    ramdisk {
+      description = "Initial ramdisk";
+      data = /incbin/("initrd");
+      type = "ramdisk";
+      os = "linux";
+      arch = "arm64";
+      compression = "none";
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+    // XXX: wrong here. According to
+    // https://fitspec.osfw.foundation/#optional-properties it should be a
+    // cmdline property in the configurations sectiok
+    bootargs {
+      description = "Set kernel boot arguments";
+      data = /incbin/("bootargs.env");
+      type = "script";
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+  };
+  configurations {
+    default = "qemu-arm";
+    qemu-arm {
+      description = "Boot Linux in QEMU";
+      kernel = "kernel";
+      ramdisk = "ramdisk";
+      script = "bootargs";
+      compatible = "linux,dummy-virt";
+      //fdt = "fdt";
+      signature-1 {
+        //algorithm can be set from outside via -o
+        algo = "sha256";
+        //algo = "sha256,ecdsa256";
+        //algo = "sha256,rsa2048";
+	// XXX: unfortunately this cannot be set from outside. Would have to be
+	// implemented in u-boot. (-G resp -K only work for auto mode without config)
+	key-name-hint = "signkey";
+	sign-images = "ramdisk", "kernel", "script";
+      };
+    };
+  };
+};

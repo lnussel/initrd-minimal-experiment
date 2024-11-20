@@ -1,0 +1,78 @@
+/dts-v1/;
+/ {
+  description = "Boot Linux";
+  #address-cells = <1>;
+  images {
+    kernel {
+      description = "Vanilla Linux kernel";
+      data = /incbin/("./vmlinux.bin.gz");
+      type = "kernel";
+      arch = "x86_64";
+      os = "linux";
+      compression = "gzip";
+      load = <0x01000000>;
+      entry = <0x00000000>;
+      hash-2 {
+	algo = "sha256";
+      };
+    };
+
+    setup {
+      description = "Linux setup.bin";
+      data = /incbin/("./setup.bin");
+      type = "x86_setup";
+      arch = "x86_64";
+      os = "linux";
+      compression = "none";
+      load = <0x00090000>;
+      entry = <0x00090000>;
+      hash-2 {
+	algo = "sha256";
+      };
+    };
+
+    ramdisk {
+      description = "Initial ramdisk";
+      data = /incbin/("initrd");
+      type = "ramdisk";
+      os = "linux";
+      arch = "x86_64";
+      compression = "none";
+      load = <0x0>;
+      entry = <0x0>;
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+    bootargs {
+      description = "Set kernel boot arguments";
+      data = /incbin/("bootargs.env");
+      type = "script";
+      hash-1 {
+        algo = "sha256";
+      };
+    };
+  };
+  configurations {
+    default = "qemu-x86";
+    qemu-x86 {
+      description = "Boot Linux in QEMU";
+      kernel = "kernel";
+      setup = "setup";
+      //ramdisk = "ramdisk";
+      script = "bootargs";
+      compatible = "linux,dummy-virt";
+      //fdt = "fdt";
+      signature-1 {
+        //algorithm can be set from outside via -o
+        algo = "sha256";
+        //algo = "sha256,ecdsa256";
+        //algo = "sha256,rsa2048";
+	// XXX: unfortunately this cannot be set from outside. Would have to be
+	// implemented in u-boot. (-G resp -K only work for auto mode without config)
+	key-name-hint = "signkey";
+	sign-images = "ramdisk", "kernel", "setup", "script";
+      };
+    };
+  };
+};

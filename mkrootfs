@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+dest="rootfs"
+rm -rf "$dest"
+
+umask 022
+
+mkdir -p "$dest"/usr/{bin,sbin,lib,lib64}
+mkdir -p "$dest"/{etc,dev,proc,sys,run,var,sysroot,tmp}
+ln -s usr/bin "$dest"
+ln -s usr/sbin "$dest"
+ln -s usr/lib "$dest"
+ln -s usr/lib64 "$dest"
+
+# just some fallback
+cat <<'EOF' > "$dest"/etc/os-release
+NAME="busybox"
+ID="busybox"
+ID_LIKE="debian"
+ANSI_COLOR="0;32"
+EOF
+
+busybox=/usr/bin/busybox
+[ -e "$busybox-static" ] && busybox="$busybox-static"
+install "$busybox" "$dest/usr/bin"
+ln "$dest$busybox" "$dest/usr/bin/sh"
+ln "$dest$busybox" "$dest/usr/bin/mount"
+mkdir -p "$dest/usr/lib/busybox"
+while read -r file; do
+	ln "$dest/usr/bin/busybox" "$dest/usr/lib/busybox/$file"
+done < <("$busybox" --list)
+cat > "$dest/etc/profile" <<'EOF'
+#!/bin/sh
+# fallback to busybox tools
+PATH="$PATH:/usr/lib/busybox"
+export PATH
+EOF
+
+ln -s ../bin/sh "$dest/sbin/init"

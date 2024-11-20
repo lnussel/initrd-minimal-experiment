@@ -1,0 +1,26 @@
+Source: initrd-minimal-experiments
+Section: devel
+Priority: optional
+Build-Depends:
+ debhelper-compat (= 13),
+ busybox:arm64,
+ cpio,
+ dosfstools,
+ e2fsprogs,
+ erofs-utils,
+ fakeroot,
+ fdisk,
+ jq,
+ linux-cip:arm64,
+ mtools,
+ u-boot-tools,
+ uuid-runtime,
+ zstd
+
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: initrd-minimal-experiments
+Architecture: all
+Depends: ${misc:Depends},
+Description: Busybox only initrd and image for testing

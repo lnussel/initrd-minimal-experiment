@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
-dest="d"
+o="${1:-initrd-busybox}"
+dest="$o.d"
 rm -rf "$dest"
+
+umask 022
 
 mkdir -p "$dest"/usr/{bin,sbin,lib,lib64}
 mkdir -p "$dest"/{etc,dev,proc,sys,run,var,sysroot,tmp}
@@ -14,17 +17,18 @@ ln -s usr/lib64 "$dest"
 cat <<'EOF' > "$dest"/etc/initrd-release
 NAME="busybox"
 ID="busybox"
-ID_LIKE="opensuse suse"
 ANSI_COLOR="0;32"
 EOF
 
-install /usr/bin/busybox-static "$dest/usr/bin"
-ln "$dest/usr/bin/busybox-static" "$dest/usr/bin/sh"
-ln "$dest/usr/bin/busybox-static" "$dest/usr/bin/mount"
+busybox=/usr/bin/busybox
+[ -e "$busybox-static" ] && busybox="$busybox-static"
+install "$busybox" "$dest/usr/bin"
+ln "$dest$busybox" "$dest/usr/bin/sh"
+ln "$dest$busybox" "$dest/usr/bin/mount"
 mkdir -p "$dest/usr/lib/busybox"
 while read -r file; do
-	ln "$dest/usr/bin/busybox-static" "$dest/usr/lib/busybox/$file"
-done < <(busybox-static --list)
+	ln "$dest$busybox" "$dest/usr/lib/busybox/$file"
+done < <("$busybox" --list)
 cat > "$dest/etc/profile" <<'EOF'
 #!/bin/sh
 # fallback to busybox tools
@@ -34,16 +38,38 @@ EOF
 
 cat > "$dest/init" <<'EOF'
 #!/bin/sh
-echo "executed $0"
+echo "executed initrd $0"
 if [ "$$" = 1 ] && ! [ -e /proc/1 ]; then
 	mount -t proc proc /proc
 	mount -t devtmpfs devtmpfs /dev
 	mount -t sysfs sysfs /sys
 	mount -t tmpfs tmpfs /tmp
+	mount -t tmpfs tmpfs /run
 fi
 . /etc/profile
-exec /bin/sh -i < /dev/console > /dev/console 2>&1
+read -r cmdline < "${1:-/proc/cmdline}"
+for param in $cmdline; do
+	case "$param" in
+		root=*) root="${param#root=}" ;;
+	esac
+done
+case "$root" in
+	/*) ;;
+	UUID=*|LABEL=*) root="$(findfs "$root")"; echo "resolved root dev to $root" ;;
+	*) echo "ERROR: can't parse root fs parameter: $root" >&2; root= ;;
+esac
+if [ -z "$root" ] || grep -q rd.break /proc/cmdline; then
+	/bin/sh -i < /dev/console > /dev/console 2>&1
+fi
+mount "$root" /sysroot
+echo "switching root to $root"
+for i in proc dev sys tmp run; do
+	echo "moving $i"
+	mount --move /$i /sysroot/$i
+done
+exec switch_root /sysroot /sbin/init
 EOF
 chmod 755 "$dest/init"
 
-(cd "$dest"; find . -print0 | cpio --format newc --null -R root:root -o --quiet) > initrd-busybox
+(cd "$dest"; find . -print0 | cpio --format newc --null -R root:root -o --quiet) > "$o.new"
+mv "$o.new" "$o"

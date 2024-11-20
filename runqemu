@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# doc/develop/devicetree/dt_qemu.rst
+# qemu-system-aarch64 -machine virt -machine dumpdtb=qemu.dtb
+# cat  <(dtc -I dtb qemu.dtb) <(dtc -I dtb u-boot.dtb | grep -v /dts-v1/) | dtc - -o merged.dtb
+# u-boot dtb is in dts/dt.dtb
+# add -dtb merged.dtb to qemu command line
+#
+: "${ARCH:=$(uname -m)}"
+: "${disk:=img}"
+args=(  -m 4G -smp 4 \
+	-serial mon:stdio \
+	-nic "user,model=virtio-net-pci" \
+	-drive "if=virtio,file=$disk,format=raw,media=disk")
+
+if [ "$ARCH" = aarch64 ]; then
+	: "${uboot:=/usr/lib/u-boot/u-boot-qemuarm64.bin}"
+	args+=(-machine virt -cpu cortex-a53 \
+	      -device virtio-serial-device \
+	      -device "virtconsole,chardev=con" -chardev "vc,id=con" \
+	      -device virtio-rng-pci \
+	      -device "qemu-xhci,id=xhci")
+	args+=(-nographic)
+	args+=(-device "loader,file=$uboot")
+else
+	args+=(-bios /usr/share/qemu/ovmf-x86_64.bin)
+fi
+
+qemu-system-"$ARCH" "${args[@]}"
