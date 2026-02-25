@@ -1,7 +1,18 @@
 ARCH=$(shell uname -m)
 KEYNAME=signkey
 
--include local.mk
+KCONFIG_CONFIG  ?= .config
+export KCONFIG_CONFIG
+
+-include $(KCONFIG_CONFIG)
+
+ifdef CONFIG_X86_64
+	ARCH=x86_64
+endif
+ifdef CONFIG_ARM64
+	ARCH=aarch64
+endif
+export ARCH
 
 ifeq ($(origin ROOTFS_UUID), undefined)
 	ROOTFS_UUID=$(file < img.rootfs_uuid)
@@ -9,11 +20,10 @@ ifeq ($(origin ROOTFS_UUID), undefined)
 		ROOTFS_UUID=$(shell uuidgen)
 	endif
 endif
-export ARCH
 export ROOTFS_UUID
 export KEYNAME
 
-all: img
+all: .config img
 
 rootfs:
 	./mkrootfs
@@ -27,7 +37,7 @@ img: esp rootfs
 esp: efi-stamp mkesp
 	./mkesp
 
-ifneq ($(do_fit),)
+ifeq ($(CONFIG_FIT),y)
 efi-stamp: boot.env.in bootargs.env.in kernel.its.$(ARCH) mkefi-fit initrd keys/$(KEYNAME).crt
 	./mkefi-fit
 else
@@ -42,7 +52,7 @@ initrd: initrd-busybox
 	#gzip -9 < initrd-busybox > initrd
 	zstd -3 -T0 -q < initrd-busybox > initrd
 
-ifneq ($(do_fit),)
+ifneq ($(CONFIG_FIT),y)
 splash.bmp: /usr/share/pixmaps/distribution-logos/square-hicolor.svg
 	convert -background black $< $@
 endif
@@ -77,4 +87,10 @@ qemu: all
 clean:
 	rm -rf splash.bmp img esp efi efi-stamp rootfs initrd initrd-busybox
 
-.PHONY: all clean qemu keys
+.PHONY: all clean qemu keys menuconfig
+
+menuconfig:
+	kconfig mconf Kconfig
+
+$(KCONFIG_CONFIG): Kconfig
+	@if [ -e .config ]; then kconfig conf --oldconfig Kconfig; else kconfig conf --alldefconfig Kconfig; fi

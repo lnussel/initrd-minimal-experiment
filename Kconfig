@@ -1,0 +1,48 @@
+mainmenu "Initrd Experiments"
+
+choice
+	prompt "Architecture"
+	default ARM64
+
+config ARM64
+	bool "aarch64"
+	select ARM
+
+config X86_64
+	bool "x86_64"
+	select X86
+
+endchoice
+
+choice
+	prompt "Image Format"
+	default FIT
+
+config FIT
+	bool "FIT"
+
+config UKI
+	bool "UKI (PE)"
+
+endchoice
+
+config ROOTFS_TYPE
+	string "rootfs fs type (erofs or ext4)"
+	default "erofs"
+
+config UBOOT
+	string "path to u-boot.bin"
+	default "/usr/lib/u-boot/qemu-x86_64/u-boot.bin" if X86_64
+	default "/usr/lib/u-boot/qemu_arm64/u-boot.bin" if ARM64
+
+# placeholders
+config ARM
+	bool
+
+config X86
+	bool
+
+config ARCH
+	string
+	default "aarch64" if ARM64
+	default "x86_64" if X86_64

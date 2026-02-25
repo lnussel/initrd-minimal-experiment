@@ -2,8 +2,10 @@
 set -ex
 shopt -s nullglob
 
+. .config
 : "${mkimage:=mkimage}"
-: "${ARCH:=$(uname -m)}"
+: "${CONFIG_ARCH:=$(uname -m)}"
+: "${ARCH:=$CONFIG_ARCH}"
 case "$ARCH" in
 	x86_64) efiarch=x64; uarch="$ARCH" ;;
 	aarch64) efiarch=aa64; uarch="arm64" ;;

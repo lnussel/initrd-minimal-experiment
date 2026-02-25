@@ -6,24 +6,25 @@
 # u-boot dtb is in dts/dt.dtb
 # add -dtb merged.dtb to qemu command line
 #
-: "${ARCH:=$(uname -m)}"
+. .config
+: "${CONFIG_ARCH:=$(uname -m)}"
 : "${disk:=img}"
 args=(  -m 4G -smp 4 \
 	-serial mon:stdio \
 	-nic "user,model=virtio-net-pci" \
 	-drive "if=virtio,file=$disk,format=raw,media=disk")
 
-if [ "$ARCH" = aarch64 ]; then
-	: "${uboot:=/usr/lib/u-boot/u-boot-qemuarm64.bin}"
+if [ "$CONFIG_ARCH" = aarch64 ]; then
+	: "${CONFIG_UBOOT:=/usr/lib/u-boot/u-boot-qemuarm64.bin}"
 	args+=(-machine virt -cpu cortex-a53 \
 	      -device virtio-serial-device \
 	      -device "virtconsole,chardev=con" -chardev "vc,id=con" \
 	      -device virtio-rng-pci \
 	      -device "qemu-xhci,id=xhci")
 	args+=(-nographic)
-	args+=(-device "loader,file=$uboot")
+	args+=(-device "loader,file=$CONFIG_UBOOT")
 else
 	args+=(-bios /usr/share/qemu/ovmf-x86_64.bin)
 fi
 
-qemu-system-"$ARCH" "${args[@]}"
+qemu-system-"$CONFIG_ARCH" "${args[@]}"

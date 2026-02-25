@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+. .config
+
 # size in MB
 esp_size=100
 img_size=1024
@@ -8,6 +10,8 @@ img_size=1024
 image="${1:?}"
 efi="${2:?}"
 data="${3:?}"
+
+: "${CONFIG_ROOTFS_TYPE:?}"
 
 tmpdir=$(mktemp -d -t mkimage.XXXXXX)
 cleanup()
@@ -51,11 +55,15 @@ if [ -z "$ROOTFS_UUID" ]; then
 fi
 [ -e "$image.rootfs_uuid" ] || echo "$ROOTFS_UUID" > "$image.rootfs_uuid"
 dd if="$esp" of="$img" bs=512 seek="${offsets[0]}" status=none conv=notrunc
-if [ -e /usr/bin/mkfs.erofs ]; then
+if [ "$CONFIG_ROOTFS_TYPE" = "erofs" ]; then
 	mkfs.erofs -U "$ROOTFS_UUID" --all-root rootfs.erofs "$data"
 	dd if=rootfs.erofs of="$img" seek="$((${offsets[1]}))" conv=notrunc
+	rm rootfs.erofs
+elif [ "$CONFIG_ROOTFS_TYPE" = "ext4" ]; then
+	fakeroot /usr/sbin/mkfs.ext4 -F -L rootfs -U "${ROOTFS_UUID}" -d "$data" -E no_copy_xattrs,root_owner=0:0,offset="$[${offsets[1]}*512]" "$img" "$[${sizes[1]}*512/1024]k"
 else
-fakeroot /usr/sbin/mkfs.ext4 -F -L rootfs -U "${ROOTFS_UUID}" -d "$data" -E no_copy_xattrs,root_owner=0:0,offset="$[${offsets[1]}*512]" "$img" "$[${sizes[1]}*512/1024]k"
+	echo "Error: Unsupported rootfs type $CONFIG_ROOTFS_TYPE" >&2
+	exit 1
 fi
 
 mv "$img" "$image"
