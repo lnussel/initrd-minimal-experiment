@@ -13,6 +13,7 @@
       // for some reason bootm insits the entries exist even though unused
       load = <0x0000000>;
       entry = <0x0000000>;
+      bootargs = "### TEST BOOTARGS ###";
       hash-1 {
         algo = "sha256";
       };
@@ -42,17 +43,6 @@
         algo = "sha256";
       };
     };
-    // XXX: wrong here. According to
-    // https://fitspec.osfw.foundation/#optional-properties it should be a
-    // cmdline property in the configurations sectiok
-    bootargs {
-      description = "Set kernel boot arguments";
-      data = /incbin/("bootargs.env");
-      type = "script";
-      hash-1 {
-        algo = "sha256";
-      };
-    };
   };
   configurations {
     default = "qemu-arm";
@@ -60,7 +50,6 @@
       description = "Boot Linux in QEMU";
       kernel = "kernel";
       ramdisk = "ramdisk";
-      script = "bootargs";
       compatible = "linux,dummy-virt";
       //fdt = "fdt";
       signature-1 {
@@ -71,7 +60,7 @@
 	// XXX: unfortunately this cannot be set from outside. Would have to be
 	// implemented in u-boot. (-G resp -K only work for auto mode without config)
 	key-name-hint = "signkey";
-	sign-images = "ramdisk", "kernel", "script";
+	sign-images = "kernel", "ramdisk", "fdt", "script";
       };
     };
   };

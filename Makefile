@@ -3,7 +3,10 @@ KEYNAME=signkey
 
 KCONFIG_CONFIG  ?= .config
 export KCONFIG_CONFIG
+KCONFIG_AUTOHEADER ?= config.h
+export KCONFIG_AUTOHEADER
 
+-include local.mk
 -include $(KCONFIG_CONFIG)
 
 ifdef CONFIG_X86_64
@@ -23,7 +26,7 @@ endif
 export ROOTFS_UUID
 export KEYNAME
 
-all: .config img
+all: $(KCONFIG_AUTOHEADER) img
 
 rootfs:
 	./mkrootfs
@@ -38,7 +41,7 @@ esp: efi-stamp mkesp
 	./mkesp
 
 ifeq ($(CONFIG_FIT),y)
-efi-stamp: boot.env.in bootargs.env.in kernel.its.$(ARCH) mkefi-fit initrd keys/$(KEYNAME).crt
+efi-stamp: boot.env.in bootargs.env.in kernel.its mkefi-fit initrd keys/$(KEYNAME).crt
 	./mkefi-fit
 else
 efi-stamp: mkefi initrd
@@ -56,6 +59,9 @@ ifneq ($(CONFIG_FIT),y)
 splash.bmp: /usr/share/pixmaps/distribution-logos/square-hicolor.svg
 	convert -background black $< $@
 endif
+
+kernel.its: kernel.its.in config.h
+	$(CPP) -nostdinc -include config.h -D__ASSEMBLY__ -undef -D__DTS__ -x assembler-with-cpp -o $@ $<
 
 #%.scr: %.env
 #	mkimage -f auto -A arm64 -T script -C none -n 'U-Boot script' -d $< $@
@@ -94,3 +100,6 @@ menuconfig:
 
 $(KCONFIG_CONFIG): Kconfig
 	@if [ -e .config ]; then kconfig conf --oldconfig Kconfig; else kconfig conf --alldefconfig Kconfig; fi
+
+$(KCONFIG_AUTOHEADER): $(KCONFIG_CONFIG)
+	sed -ne '/^CONFIG_/{s/=y$$/=1/;s/^\(CONFIG_[^=]\+\)=\(.*\)/#define \1 \2/;p}' < $^ > $@

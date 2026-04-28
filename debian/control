@@ -5,6 +5,7 @@ Build-Depends:
  debhelper-compat (= 13),
  busybox:arm64,
  cpio,
+ device-tree-compiler,
  dosfstools,
  e2fsprogs,
  erofs-utils,
@@ -13,6 +14,7 @@ Build-Depends:
  jq,
  linux-cip:arm64,
  mtools,
+ kconfig-frontends-nox,
  u-boot-tools,
  uuid-runtime,
  zstd

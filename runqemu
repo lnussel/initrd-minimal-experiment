@@ -8,6 +8,7 @@
 #
 . .config
 : "${CONFIG_ARCH:=$(uname -m)}"
+: "${CONFIG_UBOOT:=/usr/lib/u-boot/qemu-$CONFIG_ARCH/u-boot.bin}"
 : "${disk:=img}"
 args=(  -m 4G -smp 4 \
 	-serial mon:stdio \
@@ -15,16 +16,13 @@ args=(  -m 4G -smp 4 \
 	-drive "if=virtio,file=$disk,format=raw,media=disk")
 
 if [ "$CONFIG_ARCH" = aarch64 ]; then
-	: "${CONFIG_UBOOT:=/usr/lib/u-boot/u-boot-qemuarm64.bin}"
-	args+=(-machine virt -cpu cortex-a53 \
+	args+=(-machine virt -cpu cortex-a57 \
 	      -device virtio-serial-device \
 	      -device "virtconsole,chardev=con" -chardev "vc,id=con" \
 	      -device virtio-rng-pci \
 	      -device "qemu-xhci,id=xhci")
 	args+=(-nographic)
-	args+=(-device "loader,file=$CONFIG_UBOOT")
-else
-	args+=(-bios /usr/share/qemu/ovmf-x86_64.bin)
 fi
+args+=(-bios "$CONFIG_UBOOT")
 
 qemu-system-"$CONFIG_ARCH" "${args[@]}"
