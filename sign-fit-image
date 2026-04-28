@@ -1,0 +1,39 @@
+#!/bin/bash
+. .config
+: "${mkimage:=mkimage}"
+: "${KEYNAME:=signkey}"
+set -xe
+fitimage="${1:?}"
+keydir="${2:?}"
+cat > "$fitimage.signkey.dts" <<-EOF
+	/dts-v1/;
+
+	/ {
+	  signature {
+	  };
+	};
+	EOF
+# mkimage wants to write the pubkey into this file. Need to reserve
+# some space as mkimage is not handling allocation errors well
+dtc -S 4096 -o "$fitimage.signkey.dtb" "$fitimage.signkey.dts"
+keylen=$(openssl x509 -in "$keydir/$KEYNAME.crt" -noout -text|sed -ne 's/ *Public-Key: (\(2048\|4096\) bit)/\1/p')
+[ -n "$keylen" ] || { echo "unsupported key or keylen" >&2; false; }
+images=($(fdtget -l "$fitimage" /images))
+images=("${images[@]%-*}")
+for conf in $(fdtget -l "$fitimage" /configurations); do
+	# remove previous signatures
+	for s in $(fdtget -l "$fitimage" "/configurations/$conf"); do
+		if [ "$s" = "signature" ] || [ "$s" != "${s#signature}" ]; then
+			fdtput -r "$fitimage" "/configurations/$conf/$s"
+		fi
+	done
+	fdtput -c "$fitimage" /configurations/"$conf"/signature
+	fdtput -t s "$fitimage" /configurations/"$conf"/signature algo "sha256,rsa$keylen"
+	fdtput -t s "$fitimage" /configurations/"$conf"/signature sign-images "${images[@]}"
+	fdtput -t s "$fitimage" /configurations/"$conf"/signature key-name-hint "$KEYNAME"
+done
+# needs private key without passphrase. key must have suffix key in pem format and the certificate .crt in pem format
+mkimage -F -K "$fitimage".signkey.dtb -k "$keydir" -r "$fitimage"
+# verify signature was added as mkimage may not fail
+fdtget "$fitimage.signkey.dtb" /signature/key-"$KEYNAME" required
+fit_check_sign -f "$fitimage" -k "$fitimage.signkey.dtb"

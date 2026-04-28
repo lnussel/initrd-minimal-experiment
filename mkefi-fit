@@ -39,33 +39,15 @@ if ! [ -e "$kernel" ]; then
 fi
 
 rm -rf efi
-if [ -n "$KEYNAME" ]; then
-	if ! [ -e keys/"$KEYNAME".crt ]; then
-		echo "$KEYNAME does not exist"
-		exit 1
-	fi
-	cat > empty.dts <<-EOF
-	/dts-v1/;
-
-	/ {
-		signature {
-		};
-	};
-	EOF
-	dtc -o "$KEYNAME.dtb" empty.dts
-	rm empty.dts
-fi
 mkdir -p efi/FIT
 rm -f Image
 ln -s "$kernel" Image
 #zcat "$kernel" > Image
 sed -e "s,@FIT@,FIT/Linux-$kv.fit," < boot.env.in > boot.env
 $mkimage -f auto -A "$uarch" -T script -C none -n 'U-Boot script' -d boot.env boot.scr
+[ -z "$KEYNAME" ] || ./sign-fit-image boot.scr keys
 mkimage_args=(-v -f kernel.its -r)
-mkimage_args+=(-E)
-[ -z "$KEYNAME" ] || mkimage_args+=(-K "$KEYNAME.dtb" -k "keys" -o sha256,rsa2048)
 #mkimage_args+=(-g foo -k keys -o sha256,rsa2048)
-#mkimage_args+=(-E)
 set -x
 if [ -n "$ROOTFS_UUID" ]; then
 	sed -e "/^setenv bootargs/s/\$/ root=UUID=$ROOTFS_UUID/" < bootargs.env.in > bootargs.env
@@ -73,9 +55,9 @@ else
 	cp bootargs.env.in bootargs.env
 fi
 $mkimage "${mkimage_args[@]}" kernel.fit
-# verify signature was added as mkimage may not fail
-fdtget "$KEYNAME".dtb /signature/key-signkey required
-fit_check_sign -f kernel.fit -k signkey.dtb
+[ -z "$KEYNAME" ] || ./sign-fit-image kernel.fit keys
+# move bulk data outside dtb
+$mkimage -E -F kernel.fit
 #cp ~/git/linux-cip/arch/arm64/boot/Image efi/EFI/BOOT/bootaa64.efi
 cp kernel.fit efi/FIT/Linux-"$kv".fit
 cp boot.scr efi/boot.scr
