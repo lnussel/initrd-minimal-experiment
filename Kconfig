@@ -35,6 +35,15 @@ config UBOOT
 	default "/usr/lib/u-boot/qemu-x86_64/u-boot.bin" if X86_64
 	default "/usr/lib/u-boot/qemu_arm64/u-boot.bin" if ARM64
 
+config TPM
+	bool "TPM support"
+	default n
+
+config SWTPM
+	bool "Use SWTPM"
+	depends on TPM
+	default n
+
 # placeholders
 config ARM
 	bool

@@ -15,6 +15,26 @@ args=(  -m 4G -smp 4 \
 	-nic "user,model=virtio-net-pci" \
 	-drive "if=virtio,file=$disk,format=raw,media=disk")
 
+use_swtpm=
+if [ "$CONFIG_ARCH" = "x86_64" ] || [ "$CONFIG_SWTPM" = y ]; then
+	[ -x /usr/bin/swtpm ] && use_swtpm=1
+fi
+
+if [ -n "$use_swtpm" ] || [ "$CONFIG_TPM" = y ]; then
+	[ -x /usr/bin/swtpm ] || { echo "ERROR: missing swtpm" >&2; exit 1; }
+
+	mkdir -p "$disk.tpm" || :
+	swtpm socket -d --tpmstate dir="$disk.tpm" --ctrl type=unixio,path="$disk.tpm/swtpm-sock" --tpm2 --log file="$disk.tpm/log",level=20
+	sleep 1
+	args+=(-chardev "socket,id=chrtpm,path=$disk.tpm/swtpm-sock"
+	  -tpmdev "emulator,id=tpm0,chardev=chrtpm")
+	if [ "$CONFIG_ARCH" = "x86_64" ]; then
+		args+=(-device "tpm-tis,tpmdev=tpm0")
+	else
+		args+=(-device "tpm-tis-device,tpmdev=tpm0")
+	fi
+fi
+
 if [ "$CONFIG_ARCH" = aarch64 ]; then
 	args+=(-machine virt -cpu cortex-a57 \
 	      -device virtio-serial-device \
