@@ -28,7 +28,7 @@ export KEYNAME
 
 all: $(KCONFIG_AUTOHEADER) img
 
-rootfs:
+rootfs: mkrootfs
 	./mkrootfs
 
 img: esp rootfs
@@ -41,7 +41,7 @@ esp: efi-stamp mkesp
 	./mkesp
 
 ifeq ($(CONFIG_FIT),y)
-efi-stamp: boot.env.in bootargs.env.in kernel.its mkefi-fit initrd keys/$(KEYNAME).crt
+efi-stamp: boot.env.in kernel.its mkefi-fit initrd keys/$(KEYNAME).crt
 	./mkefi-fit
 else
 efi-stamp: mkefi initrd
@@ -61,7 +61,7 @@ splash.bmp: /usr/share/pixmaps/distribution-logos/square-hicolor.svg
 endif
 
 kernel.its: kernel.its.in config.h
-	$(CPP) -nostdinc -include config.h -D__ASSEMBLY__ -undef -D__DTS__ -x assembler-with-cpp -o $@ $<
+	$(CPP) -nostdinc -include config.h -D__ASSEMBLY__ -undef -D__DTS__ -DROOTFS_UUID=$(ROOTFS_UUID) -x assembler-with-cpp -o $@ $<
 
 #%.scr: %.env
 #	mkimage -f auto -A arm64 -T script -C none -n 'U-Boot script' -d $< $@

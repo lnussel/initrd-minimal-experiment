@@ -1,3 +1,5 @@
+#define xstr(x) str(x)
+#define str(x) #x
 /dts-v1/;
 / {
   description = "Boot Linux";
@@ -13,7 +15,6 @@
       // for some reason bootm insits the entries exist even though unused
       load = <0x0000000>;
       entry = <0x0000000>;
-      bootargs = "### TEST BOOTARGS ###";
       hash-1 {
         algo = "sha256";
       };
@@ -51,6 +52,7 @@
       kernel = "kernel";
       ramdisk = "ramdisk";
       compatible = "linux,dummy-virt";
+      cmdline = xstr(quiet panic=3 root=UUID=ROOTFS_UUID);
       //fdt = "fdt";
       signature-1 {
         //algorithm can be set from outside via -o

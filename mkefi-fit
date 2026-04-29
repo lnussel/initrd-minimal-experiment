@@ -48,12 +48,6 @@ $mkimage -f auto -A "$uarch" -T script -C none -n 'U-Boot script' -d boot.env bo
 [ -z "$KEYNAME" ] || ./sign-fit-image boot.scr keys
 mkimage_args=(-v -f kernel.its -r)
 #mkimage_args+=(-g foo -k keys -o sha256,rsa2048)
-set -x
-if [ -n "$ROOTFS_UUID" ]; then
-	sed -e "/^setenv bootargs/s/\$/ root=UUID=$ROOTFS_UUID/" < bootargs.env.in > bootargs.env
-else
-	cp bootargs.env.in bootargs.env
-fi
 $mkimage "${mkimage_args[@]}" kernel.fit
 [ -z "$KEYNAME" ] || ./sign-fit-image kernel.fit keys
 # move bulk data outside dtb
