@@ -55,3 +55,4 @@ $mkimage -E -F kernel.fit
 #cp ~/git/linux-cip/arch/arm64/boot/Image efi/EFI/BOOT/bootaa64.efi
 cp kernel.fit efi/FIT/Linux-"$kv".fit
 cp boot.scr efi/boot.scr
+: > efi-stamp
