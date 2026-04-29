@@ -45,6 +45,7 @@ if [ "$$" = 1 ] && ! [ -e /proc/1 ]; then
 	mount -t sysfs sysfs /sys
 	mount -t tmpfs tmpfs /tmp
 	mount -t tmpfs tmpfs /run
+	mount -t securityfs securityfs /sys/kernel/security
 fi
 . /etc/profile
 read -r cmdline < "${1:-/proc/cmdline}"
