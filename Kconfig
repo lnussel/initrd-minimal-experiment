@@ -44,6 +44,10 @@ config SWTPM
 	depends on TPM
 	default n
 
+config SECURE
+	bool "ARM trustzone support (qemu secure=on)"
+	default n
+
 # placeholders
 config ARM
 	bool

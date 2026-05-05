@@ -6,7 +6,7 @@
 # u-boot dtb is in dts/dt.dtb
 # add -dtb merged.dtb to qemu command line
 #
-. .config
+. "${KCONFIG_CONFIG:-.config}"
 : "${CONFIG_ARCH:=$(uname -m)}"
 : "${CONFIG_UBOOT:=/usr/lib/u-boot/qemu-$CONFIG_ARCH/u-boot.bin}"
 : "${disk:=img}"
@@ -16,11 +16,11 @@ args=(  -m 4G -smp 4 \
 	-drive "if=virtio,file=$disk,format=raw,media=disk")
 
 use_swtpm=
-if [ "$CONFIG_ARCH" = "x86_64" ] || [ "$CONFIG_SWTPM" = y ]; then
+if [ "$CONFIG_ARCH" = "x86_64" ] || [ "$CONFIG_SECURE" != y ]; then
 	[ -x /usr/bin/swtpm ] && use_swtpm=1
 fi
 
-if [ -n "$use_swtpm" ] || [ "$CONFIG_TPM" = y ]; then
+if [ -n "$use_swtpm" ] || [ "$CONFIG_SWTPM" = y ]; then
 	[ -x /usr/bin/swtpm ] || { echo "ERROR: missing swtpm" >&2; exit 1; }
 
 	mkdir -p "$disk.tpm" || :
@@ -36,7 +36,11 @@ if [ -n "$use_swtpm" ] || [ "$CONFIG_TPM" = y ]; then
 fi
 
 if [ "$CONFIG_ARCH" = aarch64 ]; then
-	args+=(-machine virt -cpu cortex-a57 \
+	machine="virt"
+	if [ "$CONFIG_SECURE" = y ]; then
+		machine="virt,secure=on"
+	fi
+	args+=(-machine "$machine" -cpu cortex-a57 \
 	      -device virtio-serial-device \
 	      -device "virtconsole,chardev=con" -chardev "vc,id=con" \
 	      -device virtio-rng-pci \
